@@ -42,6 +42,11 @@ body::before {
 
 button {
   font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
 }
 
 .stage {
@@ -1125,6 +1130,8 @@ h2 {
 }
 
 .phone-card {
+  position: relative;
+  z-index: 1;
   padding: 18px;
   border: 1px solid rgba(240, 196, 108, 0.22);
   border-radius: 8px;
@@ -1144,6 +1151,8 @@ h2 {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
+  position: relative;
+  z-index: 2;
 }
 
 .mobile-options .option-button {
@@ -1151,10 +1160,15 @@ h2 {
   padding: 16px;
   font-size: 1.05rem;
   text-align: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-options .option-button:not(:disabled):active {
+.mobile-options .option-button:not(:disabled):active,
+.mobile-options .option-button.pressed {
   transform: translateY(1px);
+  border-color: rgba(240, 196, 108, 0.78);
+  box-shadow: 0 14px 34px rgba(12, 31, 24, 0.28), 0 0 0 3px rgba(240, 196, 108, 0.16);
 }
 
 .vote-message {
@@ -1163,6 +1177,9 @@ h2 {
   color: var(--gold);
   font-weight: 900;
   text-align: center;
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
 }
 
 .waiting-card {
@@ -1242,6 +1259,8 @@ h2 {
   background: linear-gradient(180deg, rgba(120, 134, 74, 0.98), rgba(46, 90, 59, 0.98));
   font-size: 1rem;
   font-weight: 950;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .form-submit:disabled,

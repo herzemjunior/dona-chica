@@ -30,6 +30,9 @@ const state = {
   listenersReady: false
 };
 
+const memoryStorage = {};
+const pendingVotes = new Set();
+
 let dbApi = null;
 let localSaveTimer = null;
 let localChannel = null;
@@ -46,6 +49,7 @@ let heartbeatTimer = null;
 let liveRefreshTimer = null;
 let raffleTimer = null;
 let livePageTimer = null;
+let lastParticipantLoggedStep = null;
 
 const welcomeMessage = "Olá, senhores!\n\nEu sou a Dona Chica.\n\nUma Assistente Virtual desenvolvida com Inteligência Artificial para acompanhar vocês durante esta apresentação.\n\nÉ uma grande alegria estar aqui.\n\nAntes de começarmos nossa conversa, peço que apontem a câmera do celular para o QR Code abaixo e participem das interações ao longo da apresentação.";
 
@@ -139,22 +143,34 @@ function readLocalJson(key, fallback) {
 
 function readLocalValue(key) {
   try {
-    return window.localStorage?.getItem(key) || "";
+    return window.localStorage?.getItem(key) || memoryStorage[key] || "";
   } catch (error) {
-    return "";
+    participantLog("localStorage indisponivel, usando memoria", error);
+    return memoryStorage[key] || "";
   }
 }
 
 function writeLocalValue(key, value) {
   try {
     window.localStorage?.setItem(key, value);
-  } catch (error) {}
+  } catch (error) {
+    participantLog("Falha ao gravar no localStorage, usando memoria", error);
+  }
+  memoryStorage[key] = value;
 }
 
 function removeLocalValue(key) {
   try {
     window.localStorage?.removeItem(key);
-  } catch (error) {}
+  } catch (error) {
+    participantLog("Falha ao remover do localStorage", error);
+  }
+  delete memoryStorage[key];
+}
+
+function participantLog(message, detail = "") {
+  if (!isParticipate) return;
+  console.log(`[Dona Chica /participar] ${message}`, detail);
 }
 
 function saveLocalState() {
@@ -311,6 +327,10 @@ function renderPanel() {
 }
 
 function renderParticipant() {
+  if (lastParticipantLoggedStep !== state.currentStep) {
+    participantLog("etapa atual recebida", state.currentStep);
+    lastParticipantLoggedStep = state.currentStep;
+  }
   if (state.currentStep === WAITING_STEP) {
     renderParticipantWaiting();
     return;
@@ -365,7 +385,7 @@ function renderNameForm() {
         <span id="nameError">Uma palavra, até 10 caracteres.</span>
         <strong id="nameCounter">0/10</strong>
       </div>
-      <button id="nameSubmit" type="submit" class="form-submit">Entrar na apresentação</button>
+      <button id="nameSubmit" type="button" class="form-submit">Entrar na apresentação</button>
     </form>
   `;
   setText("voteMessage", "");
@@ -381,14 +401,29 @@ function renderNameForm() {
     error.textContent = normalized ? "Pronto para entrar." : "Digite seu nome em uma palavra.";
     touchLivePresence();
   });
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
+  const submitName = () => {
     const name = normalizeParticipantName(input.value);
     if (!name) {
       error.textContent = "Digite seu nome para entrar.";
       return;
     }
+    participantLog("nome enviado", name);
+    input.blur();
+    document.activeElement?.blur?.();
+    const submit = document.getElementById("nameSubmit");
+    if (submit) submit.disabled = true;
     saveParticipantName(name);
+  };
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    submitName();
+  });
+  document.getElementById("nameSubmit")?.addEventListener("click", submitName);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitName();
+    }
   });
 }
 
@@ -404,7 +439,16 @@ function renderOptions(targetId, step, clickable) {
     button.className = `option-button${votedOption === index ? " selected" : ""}`;
     button.textContent = votedOption === index ? `✓ ${label}` : label;
     button.disabled = !clickable || alreadyVoted;
-    if (clickable) button.addEventListener("click", () => vote(index));
+    if (clickable) {
+      button.addEventListener("click", () => {
+        participantLog("botao clicado", { step: step.id, optionIndex: index, label });
+        if (!button.disabled) {
+          button.classList.add("pressed");
+          button.textContent = `✓ ${label}`;
+        }
+        vote(index);
+      });
+    }
     target.appendChild(button);
   });
 }
@@ -566,10 +610,13 @@ function renderRaffleResult() {
 }
 
 async function vote(optionIndex) {
-  if (hasVoted(state.currentStep)) return;
-  await updateLivePresence(true);
+  const voteKey = getVoteKey(state.currentStep);
+  if (hasVoted(state.currentStep) || pendingVotes.has(voteKey)) return;
+  pendingVotes.add(voteKey);
+  updateLivePresence(true).catch((error) => participantLog("erro no heartbeat antes do voto", error));
   const anonymousId = ensureAnonymousId();
   const selectedLabel = steps[state.currentStep].options[optionIndex];
+  participantLog("voto enviado", { step: steps[state.currentStep].id, optionIndex, selectedLabel });
   if (steps[state.currentStep].id === "quem-esta-aqui") {
     writeLocalValue("donaChicaRole", selectedLabel);
   }
@@ -578,17 +625,25 @@ async function vote(optionIndex) {
   renderParticipant();
 
   if (state.usingFirebase) {
-    const { database, ref, runTransaction, update, push, serverTimestamp, base } = dbApi;
-    const stepId = steps[state.currentStep].id;
-    const responsePath = isWarmupStep(steps[state.currentStep]) ? `${base}/warmup/responses/${optionIndex}` : `${base}/responses/${stepId}/${optionIndex}`;
-    await runTransaction(ref(database, responsePath), (value) => (value || 0) + 1);
-    await update(ref(database, `${base}/participants/${anonymousId}`), { lastSeen: serverTimestamp() });
-    await push(ref(database, `${base}/logs`), {
-      anonymousId,
-      stepId,
-      optionIndex,
-      createdAt: serverTimestamp()
-    });
+    try {
+      const { database, ref, runTransaction, update, push, serverTimestamp, base } = dbApi;
+      const stepId = steps[state.currentStep].id;
+      const responsePath = isWarmupStep(steps[state.currentStep]) ? `${base}/warmup/responses/${optionIndex}` : `${base}/responses/${stepId}/${optionIndex}`;
+      await runTransaction(ref(database, responsePath), (value) => (value || 0) + 1);
+      await update(ref(database, `${base}/participants/${anonymousId}`), { lastSeen: serverTimestamp() });
+      await push(ref(database, `${base}/logs`), {
+        anonymousId,
+        stepId,
+        optionIndex,
+        createdAt: serverTimestamp()
+      });
+      participantLog("voto confirmado no Firebase", { step: stepId, optionIndex });
+    } catch (error) {
+      participantLog("erro ao enviar voto para Firebase", error);
+      setText("voteMessage", "Resposta marcada na tela. Verifique sua conexão se a mensagem persistir.");
+    } finally {
+      pendingVotes.delete(voteKey);
+    }
     return;
   }
 
@@ -602,6 +657,7 @@ async function vote(optionIndex) {
   state.participants[anonymousId] = { lastSeen: Date.now() };
   saveLocalState();
   renderAll(true);
+  pendingVotes.delete(voteKey);
 }
 
 async function setStep(nextStep) {
@@ -817,8 +873,12 @@ async function saveParticipantName(name) {
   if (!normalized) return;
   writeLocalValue("donaChicaName", normalized);
   setText("voteMessage", "Pronto! A Dona Chica já sabe que você está por aqui ;)");
-  await updateLivePresence(true);
-  renderParticipant();
+  participantLog("nome salvo", normalized);
+  updateLivePresence(true).catch((error) => {
+    participantLog("erro no heartbeat apos nome", error);
+    setText("voteMessage", "Nome registrado. Se a conexão oscilar, continue na tela da Dona Chica.");
+  });
+  setTimeout(() => renderParticipant(), 160);
 }
 
 function startLivePresence() {
@@ -826,7 +886,7 @@ function startLivePresence() {
   clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(() => {
     if (isParticipantPageVisible()) {
-      updateLivePresence();
+      updateLivePresence().catch((error) => participantLog("erro no heartbeat", error));
     } else {
       markLivePresenceInactive();
     }
@@ -836,22 +896,22 @@ function startLivePresence() {
   });
   document.addEventListener("visibilitychange", () => {
     if (isParticipantPageVisible()) {
-      updateLivePresence(true);
+      updateLivePresence(true).catch((error) => participantLog("erro ao reativar presenca", error));
     } else {
       markLivePresenceInactive();
     }
   });
-  window.addEventListener("focus", () => updateLivePresence(true));
+  window.addEventListener("focus", () => updateLivePresence(true).catch((error) => participantLog("erro ao focar pagina", error)));
   window.addEventListener("blur", () => markLivePresenceInactive());
-  window.addEventListener("pageshow", () => updateLivePresence(true));
+  window.addEventListener("pageshow", () => updateLivePresence(true).catch((error) => participantLog("erro ao voltar para pagina", error)));
   window.addEventListener("pagehide", () => markLivePresenceInactive());
   window.addEventListener("beforeunload", () => markLivePresenceInactive());
-  updateLivePresence();
+  updateLivePresence().catch((error) => participantLog("erro no primeiro heartbeat", error));
 }
 
 function touchLivePresence() {
   if (!isParticipantPageVisible()) return;
-  updateLivePresence();
+  updateLivePresence().catch((error) => participantLog("erro no toque de presenca", error));
 }
 
 function isParticipantPageVisible() {

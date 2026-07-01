@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dona Chica: painel</title>
+    <link rel="stylesheet" href="../style.css?v=dynamic-qr-copy">
+  </head>
+  <body class="panel-page">
+    <main class="stage experience-stage" aria-label="Painel Dona Chica">
+      <section id="welcomeScreen" class="welcome-screen" aria-label="Boas-vindas Dona Chica">
+        <div class="welcome-character">
+          <img src="../assets/character-states/dona-chica-happy.png" alt="Dona Chica sorrindo para receber a plateia">
+        </div>
+        <div class="welcome-content">
+          <p class="welcome-kicker">Assistente Virtual IFAC-CXA</p>
+          <h1>Dona Chica</h1>
+          <div class="welcome-message">
+            <p id="welcomeText"></p>
+            <span class="typing-caret" aria-hidden="true"></span>
+          </div>
+          <div class="welcome-qr-card">
+            <div id="welcomeQrCode" class="welcome-qr-box" aria-label="QR Code para participar"></div>
+            <strong>Acesse e participe pelo seu celular.</strong>
+            <span id="welcomeAudienceUrl" class="welcome-audience-url"></span>
+            <button id="copyAudienceLink" class="copy-audience-link" type="button">📋 Copiar link da plateia</button>
+          </div>
+          <button id="startPresentation" class="start-presentation" type="button">Iniciar apresentação</button>
+        </div>
+      </section>
+
+      <section class="hero-scene">
+        <div class="character-area">
+          <div class="brand-kicker">Dona Chica</div>
+          <div id="donaChicaCharacter" class="character-frame" data-character-state="idle">
+            <video id="donaChicaVideo" class="character-video" autoplay muted loop playsinline preload="auto" aria-label="Dona Chica acompanhando a apresentação">
+              <source src="../assets/dona-chica-oficial.mp4" type="video/mp4">
+            </video>
+            <div class="lantern-glow" aria-hidden="true"></div>
+            <div class="lantern-particles" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="breath-light" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <section class="conversation-area">
+          <div class="top-strip">
+            <div>
+              <p class="eyebrow">Assistente Virtual IFAC-CXA</p>
+              <h1>Dona Chica</h1>
+            </div>
+            <div class="top-indicators">
+              <div id="audienceMood" class="mood-pill">
+                <span>😊</span>
+                <div>
+                  <small>Humor da Plateia</small>
+                  <strong>Curiosa</strong>
+                </div>
+              </div>
+              <div id="connectionStatus" class="status-pill">Modo local</div>
+            </div>
+          </div>
+
+          <article id="speechBubble" class="speech-bubble">
+            <p id="speechText">Olá! Eu sou a Dona Chica. Nasci entre a floresta, a escola e a curiosidade. Antes de falarmos sobre Inteligência Artificial, preciso conhecer quem está aqui comigo. Vocês me ajudam a preencher meu caderno de campo?</p>
+            <span class="typing-caret" aria-hidden="true"></span>
+          </article>
+
+          <div id="analyzing" class="analysis-panel" aria-live="polite">
+            <strong>Dona Chica está analisando...</strong>
+            <div class="analysis-track"><span></span></div>
+            <em>Construindo perfil da plateia</em>
+          </div>
+        </section>
+
+      </section>
+
+      <section class="answer-scene" aria-label="Pergunta atual">
+        <div id="panelOptions" class="panel-options" aria-label="Opções da pergunta atual"></div>
+        <div id="chart" class="chart apple-chart" aria-label="Resultado da pergunta atual"></div>
+      </section>
+
+      <section class="memory-dock">
+        <section class="live-box">
+          <div class="live-header">
+            <div>
+              <h2>Participantes ao vivo</h2>
+              <p>Permaneça conectado para participar do sorteio de livros.</p>
+            </div>
+            <button id="raffleBook" type="button">Sortear livro</button>
+          </div>
+          <div id="liveParticipants" class="live-participants" aria-live="polite"></div>
+          <div id="raffleResult" class="raffle-result" aria-live="polite"></div>
+        </section>
+      </section>
+
+      <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+      <nav class="controls" aria-label="Controle da apresentação">
+        <button id="prevStep" type="button">Voltar</button>
+        <button id="nextStep" type="button">Próxima</button>
+        <button id="resetStep" type="button">Reset etapa</button>
+        <button id="resetAll" type="button">Reset geral</button>
+      </nav>
+    </main>
+
+    <script src="../config.js?v=welcome-screen"></script>
+    <script src="../data.js?v=dynamic-qr-copy"></script>
+    <script type="module" src="../app.js?v=dynamic-qr-copy"></script>
+  </body>
+</html>

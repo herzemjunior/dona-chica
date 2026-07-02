@@ -418,7 +418,7 @@ function renderNameForm() {
     event.preventDefault();
     submitName();
   });
-  document.getElementById("nameSubmit")?.addEventListener("click", submitName);
+  bindTapAction(document.getElementById("nameSubmit"), submitName);
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -440,7 +440,7 @@ function renderOptions(targetId, step, clickable) {
     button.textContent = votedOption === index ? `✓ ${label}` : label;
     button.disabled = !clickable || alreadyVoted;
     if (clickable) {
-      button.addEventListener("click", () => {
+      bindTapAction(button, () => {
         participantLog("botao clicado", { step: step.id, optionIndex: index, label });
         if (!button.disabled) {
           button.classList.add("pressed");
@@ -451,6 +451,21 @@ function renderOptions(targetId, step, clickable) {
     }
     target.appendChild(button);
   });
+}
+
+function bindTapAction(element, handler) {
+  if (!element) return;
+  let lastActivation = 0;
+  const activate = (event) => {
+    if (element.disabled) return;
+    const now = Date.now();
+    if (now - lastActivation < 650) return;
+    lastActivation = now;
+    participantLog("toque recebido", event.type);
+    handler(event);
+  };
+  element.addEventListener("click", activate);
+  element.addEventListener("touchend", activate, { passive: true });
 }
 
 function getParticipantStepLabel() {
@@ -901,8 +916,6 @@ function startLivePresence() {
       markLivePresenceInactive();
     }
   });
-  window.addEventListener("focus", () => updateLivePresence(true).catch((error) => participantLog("erro ao focar pagina", error)));
-  window.addEventListener("blur", () => markLivePresenceInactive());
   window.addEventListener("pageshow", () => updateLivePresence(true).catch((error) => participantLog("erro ao voltar para pagina", error)));
   window.addEventListener("pagehide", () => markLivePresenceInactive());
   window.addEventListener("beforeunload", () => markLivePresenceInactive());
